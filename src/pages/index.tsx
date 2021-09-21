@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/no-static-element-interactions */
 import { GetStaticProps } from 'next';
 import Link from 'next/link';
 import Prismic from '@prismicio/client';
@@ -94,6 +95,7 @@ export default function Home({ postsPagination }: HomeProps): JSX.Element {
           </Link>
         ))}
         {nextPage && (
+          // eslint-disable-next-line jsx-a11y/click-events-have-key-events
           <strong className={styles.loadPosts} onClick={handleLoadPostsClick}>
             Carregar mais posts
           </strong>
@@ -103,38 +105,46 @@ export default function Home({ postsPagination }: HomeProps): JSX.Element {
   );
 }
 
-export const getStaticProps: GetStaticProps = async () => {
+export const getStaticProps: GetStaticProps = async ({
+  preview = false,
+  previewData,
+}) => {
   const prismic = getPrismicClient();
-  const postsResponse = await prismic.query(
-    [Prismic.predicates.at('document.type', 'posts')],
-    { fetch: ['posts.title', 'posts.subtitle', 'posts.author'], pageSize: 5 }
+
+  const { next_page, results } = await prismic.query(
+    Prismic.predicates.at('document.type', 'posts'),
+    {
+      fetch: ['post.title', 'post.subtitle', 'post.author'],
+      pageSize: 3,
+      ref: previewData?.ref ?? null,
+    }
   );
 
-  const { next_page, results } = postsResponse;
-
-  const posts = results.map(post => ({
-    uid: post.uid,
-    first_publication_date: new Date(
-      post.first_publication_date
-    ).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-    }),
-    data: {
-      title: post.data.title,
-      subtitle: post.data.subtitle,
-      author: post.data.author,
-    },
-  }));
-
-  const postsPagination = {
-    next_page,
-    results: [...posts],
-  };
+  const posts = results.map(post => {
+    return {
+      uid: post.uid,
+      first_publication_date: new Date(
+        post.first_publication_date
+      ).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      }),
+      data: {
+        title: post.data.title,
+        subtitle: post.data.subtitle,
+        author: post.data.author,
+      },
+    };
+  });
 
   return {
-    props: { postsPagination },
-    revalidate: 60 * 30, // 30 minutos
+    props: {
+      postsPagination: {
+        next_page,
+        results: posts,
+      },
+      preview,
+    },
   };
 };
